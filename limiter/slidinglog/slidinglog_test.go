@@ -216,8 +216,8 @@ func BenchmarkAllow_Parallel(b *testing.B) {
 
 func BenchmarkAllow_MultipleKeys(b *testing.B) {
 	l := New(Config{
-		Limit:  1000000,
-		Window: time.Hour,
+		Limit:  100,
+		Window: time.Second,
 	})
 
 	keys := make([]string, 1000)
