@@ -11,7 +11,7 @@ type Result struct {
 }
 
 
-type limiter interface {
+type Limiter interface {
 	Allow(key string) Result // Проверка доступа для запроса по ключу
 	AllowN(key string, n int64) Result // Проверка доступа для N запросов по ключу
 }
