@@ -168,7 +168,7 @@ func BenchmarkUnaryServerInterceptor(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			interceptor(ctx, nil, info, handler)
+			_, _ = interceptor(ctx, nil, info, handler)
 		}
 	})
 }
