@@ -59,7 +59,7 @@ func DefaultErrorHandler(w http.ResponseWriter, r *http.Request, result limiter.
 	w.Header().Set(HeaderRetryAfter, strconv.FormatInt(int64(result.RetryAfter.Seconds()), 10))
 	w.WriteHeader(http.StatusTooManyRequests)
 	
-	w.Write([]byte(`{"error":"rate limit exceeded","retry_after":` + 
+	_, _ = w.Write([]byte(`{"error":"rate limit exceeded","retry_after":` + 
 		strconv.FormatInt(int64(result.RetryAfter.Seconds()), 10) + `}`))
 }
 

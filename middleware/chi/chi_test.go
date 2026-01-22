@@ -17,7 +17,7 @@ func setupRouter(l *tokenbucket.Limiter) *chi.Mux {
 	r.Use(RateLimitByIP(l))
 	r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message":"ok"}`))
+		_, _ = w.Write([]byte(`{"message":"ok"}`))
 	})
 	return r
 }
