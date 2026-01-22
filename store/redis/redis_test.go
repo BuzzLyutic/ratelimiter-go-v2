@@ -12,7 +12,7 @@ func getTestConfig() Config {
 	if addr == "" {
 		addr = "localhost:6379"
 	}
-	
+
 	cfg := DefaultConfig()
 	cfg.Addr = addr
 	cfg.KeyPrefix = "test:ratelimit:"
@@ -22,24 +22,22 @@ func getTestConfig() Config {
 
 func setupTestStore(t *testing.T) *Store {
 	t.Helper()
-	
+
 	cfg := getTestConfig()
 	store, err := New(cfg)
 	if err != nil {
 		t.Skipf("Redis not available: %v", err)
 	}
-	
-	// Очистка после тестов
+
 	t.Cleanup(func() {
 		ctx := context.Background()
-		// Удалить тестовые ключи
 		keys, _ := store.client.Keys(ctx, "test:ratelimit:*").Result()
 		if len(keys) > 0 {
 			store.client.Del(ctx, keys...)
 		}
 		store.Close()
 	})
-	
+
 	return store
 }
 
@@ -61,7 +59,7 @@ func TestNew(t *testing.T) {
 
 func TestPing(t *testing.T) {
 	store := setupTestStore(t)
-	
+
 	ctx := context.Background()
 	if err := store.Ping(ctx); err != nil {
 		t.Errorf("ping failed: %v", err)
@@ -104,8 +102,14 @@ func TestTokenBucket_DifferentKeys(t *testing.T) {
 	rate := 10.0
 	capacity := int64(1)
 
-	result1, _ := store.TokenBucket(ctx, "user:1", rate, capacity, 1)
-	result2, _ := store.TokenBucket(ctx, "user:2", rate, capacity, 1)
+	result1, err := store.TokenBucket(ctx, "user:1", rate, capacity, 1)
+	if err != nil {
+		t.Fatalf("TokenBucket user:1 failed: %v", err)
+	}
+	result2, err := store.TokenBucket(ctx, "user:2", rate, capacity, 1)
+	if err != nil {
+		t.Fatalf("TokenBucket user:2 failed: %v", err)
+	}
 
 	if !result1.Allowed || !result2.Allowed {
 		t.Error("different keys should have separate buckets")
@@ -119,16 +123,25 @@ func TestTokenBucket_Refill(t *testing.T) {
 	rate := 10.0
 	capacity := int64(1)
 
-	store.TokenBucket(ctx, "user:refill", rate, capacity, 1)
+	_, err := store.TokenBucket(ctx, "user:refill", rate, capacity, 1)
+	if err != nil {
+		t.Fatalf("first request failed: %v", err)
+	}
 
-	result, _ := store.TokenBucket(ctx, "user:refill", rate, capacity, 1)
+	result, err := store.TokenBucket(ctx, "user:refill", rate, capacity, 1)
+	if err != nil {
+		t.Fatalf("second request failed: %v", err)
+	}
 	if result.Allowed {
 		t.Error("should be denied after using token")
 	}
 
 	time.Sleep(150 * time.Millisecond)
 
-	result, _ = store.TokenBucket(ctx, "user:refill", rate, capacity, 1)
+	result, err = store.TokenBucket(ctx, "user:refill", rate, capacity, 1)
+	if err != nil {
+		t.Fatalf("third request failed: %v", err)
+	}
 	if !result.Allowed {
 		t.Error("should be allowed after refill")
 	}
@@ -164,25 +177,34 @@ func TestSlidingWindow_WindowExpiry(t *testing.T) {
 	store := setupTestStore(t)
 	ctx := context.Background()
 
-	window := 1 * time.Second
+	window := 200 * time.Millisecond
 	limit := int64(2)
 
-	store.SlidingWindow(ctx, "user:sw:expiry", window, limit, 1)
-	store.SlidingWindow(ctx, "user:sw:expiry", window, limit, 1)
-
-	// Должен быть отклонен (limit reached)
-	result, _ := store.SlidingWindow(ctx, "user:sw:expiry", window, limit, 1)
-	if result.Allowed {
-		t.Error("should be denied")
+	_, err := store.SlidingWindow(ctx, "user:sw:expiry3", window, limit, 1)
+	if err != nil {
+		t.Fatalf("first request failed: %v", err)
+	}
+	_, err = store.SlidingWindow(ctx, "user:sw:expiry3", window, limit, 1)
+	if err != nil {
+		t.Fatalf("second request failed: %v", err)
 	}
 
-	// Ждем 2 полных окна (чтобы счетчик предыдущего окна обнулился)
-	// Таким образом взвешенные вычисления не блокируют вызов
-	time.Sleep(2100 * time.Millisecond)
+	result, err := store.SlidingWindow(ctx, "user:sw:expiry3", window, limit, 1)
+	if err != nil {
+		t.Fatalf("third request failed: %v", err)
+	}
+	if result.Allowed {
+		t.Error("should be denied when limit reached")
+	}
 
-	result, _ = store.SlidingWindow(ctx, "user:sw:expiry", window, limit, 1)
+	time.Sleep(500 * time.Millisecond)
+
+	result, err = store.SlidingWindow(ctx, "user:sw:expiry3", window, limit, 1)
+	if err != nil {
+		t.Fatalf("fourth request failed: %v", err)
+	}
 	if !result.Allowed {
-		t.Errorf("should be allowed after windows expire, got remaining=%d", result.Remaining)
+		t.Error("should be allowed after 2 windows expire")
 	}
 }
 
@@ -203,7 +225,7 @@ func BenchmarkTokenBucket(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			store.TokenBucket(ctx, "bench:user:1", rate, capacity, 1)
+			_, _ = store.TokenBucket(ctx, "bench:user:1", rate, capacity, 1)
 		}
 	})
 }
@@ -229,7 +251,7 @@ func BenchmarkTokenBucket_MultipleKeys(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
 		for pb.Next() {
-			store.TokenBucket(ctx, keys[i%len(keys)], rate, capacity, 1)
+			_, _ = store.TokenBucket(ctx, keys[i%len(keys)], rate, capacity, 1)
 			i++
 		}
 	})
@@ -250,7 +272,7 @@ func BenchmarkSlidingWindow(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			store.SlidingWindow(ctx, "bench:sw:1", window, limit, 1)
+			_, _ = store.SlidingWindow(ctx, "bench:sw:1", window, limit, 1)
 		}
 	})
 }

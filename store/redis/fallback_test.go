@@ -90,13 +90,19 @@ func TestFallbackStore_RateLimiting(t *testing.T) {
 	ctx := context.Background()
 
 	for i := 0; i < 5; i++ {
-		result, _ := store.TokenBucket(ctx, "test:fallback:3", 10, 5, 1)
+		result, err := store.TokenBucket(ctx, "test:fallback:3", 10, 5, 1)
+		if err != nil {
+			t.Fatalf("TokenBucket failed: %v", err)
+		}
 		if !result.Allowed {
 			t.Errorf("request %d should be allowed", i+1)
 		}
 	}
 
-	result, _ := store.TokenBucket(ctx, "test:fallback:3", 10, 5, 1)
+	result, err := store.TokenBucket(ctx, "test:fallback:3", 10, 5, 1)
+	if err != nil {
+		t.Fatalf("TokenBucket failed: %v", err)
+	}
 	if result.Allowed {
 		t.Error("6th request should be denied")
 	}
