@@ -23,12 +23,12 @@ func TestUnaryServerInterceptor_Allowed(t *testing.T) {
 		Limiter: limiter,
 	})
 
-	// Mock handler
+	// Мок хэндлера
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return "ok", nil
 	}
 
-	// Mock info
+	// Мок инфо
 	info := &grpc.UnaryServerInfo{
 		FullMethod: "/test.Service/Method",
 	}
@@ -65,7 +65,6 @@ func TestUnaryServerInterceptor_Denied(t *testing.T) {
 
 	ctx := context.Background()
 
-	// First 2 requests should succeed
 	for i := 0; i < 2; i++ {
 		_, err := interceptor(ctx, nil, info, handler)
 		if err != nil {
@@ -73,13 +72,11 @@ func TestUnaryServerInterceptor_Denied(t *testing.T) {
 		}
 	}
 
-	// 3rd request should fail
 	_, err := interceptor(ctx, nil, info, handler)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
 
-	// Check error code
 	st, ok := status.FromError(err)
 	if !ok {
 		t.Fatal("expected gRPC status error")
@@ -109,7 +106,6 @@ func TestUnaryServerInterceptor_Skip(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Health check should not be rate limited
 	healthInfo := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Health"}
 	for i := 0; i < 10; i++ {
 		_, err := interceptor(ctx, nil, healthInfo, handler)
@@ -129,7 +125,6 @@ func TestUnaryServerInterceptor_CustomKeyFunc(t *testing.T) {
 	interceptor := UnaryServerInterceptor(Config{
 		Limiter: limiter,
 		KeyFunc: func(ctx context.Context) string {
-			// Custom key from context
 			return "custom-key"
 		},
 	})
@@ -141,13 +136,11 @@ func TestUnaryServerInterceptor_CustomKeyFunc(t *testing.T) {
 	info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Method"}
 	ctx := context.Background()
 
-	// First request allowed
 	_, err := interceptor(ctx, nil, info, handler)
 	if err != nil {
 		t.Errorf("first request should be allowed: %v", err)
 	}
 
-	// Second request denied (same custom key)
 	_, err = interceptor(ctx, nil, info, handler)
 	if err == nil {
 		t.Error("second request should be denied")

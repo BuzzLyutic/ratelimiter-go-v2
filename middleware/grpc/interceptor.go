@@ -79,7 +79,7 @@ func UnaryServerInterceptor(cfg Config) grpc.UnaryServerInterceptor {
 			"x-ratelimit-limit", formatInt64(result.Limit),
 			"x-ratelimit-remaining", formatInt64(result.Remaining),
 		)
-		grpc.SetHeader(ctx, header)
+		_ = grpc.SetHeader(ctx, header)
 
 		return handler(ctx, req)
 	}
@@ -118,7 +118,7 @@ func StreamServerInterceptor(cfg Config) grpc.StreamServerInterceptor {
 			"x-ratelimit-limit", formatInt64(result.Limit),
 			"x-ratelimit-remaining", formatInt64(result.Remaining),
 		)
-		grpc.SetHeader(ctx, header)
+		_ = grpc.SetHeader(ctx, header)
 
 		return handler(srv, ss)
 	}
