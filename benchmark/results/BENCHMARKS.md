@@ -14,6 +14,33 @@
 | Sliding Log      | 59.9 ns    | 732.7 ns   | 244.3 ns      | 24 B/op | ~16.7M ops/sec |
 | Sliding Counter  | 83.3 ns    | 196.1 ns   | 213.7 ns      | 0 B/op  | ~12M ops/sec   |
 
+## Redis Store
+
+| Operation | Latency | Memory | Throughput |
+|-----------|---------|--------|------------|
+| Token Bucket | 234 µs | 615 B/op | ~4.3K ops/sec |
+| Sliding Window | 230 µs | 604 B/op | ~4.3K ops/sec |
+
+## HTTP Middleware
+
+| Framework | Latency | Memory | Allocations |
+|-----------|---------|--------|-------------|
+| Gin | 3488 ns | 6775 B/op | 35 allocs |
+| Chi | 3077 ns | 6674 B/op | 30 allocs |
+
+## gRPC Interceptor
+
+| Type | Latency | Memory | Allocations |
+|------|---------|--------|-------------|
+| Unary | 731.9 ns | 640 B/op | 10 allocs |
+
+## Prometheus Metrics Overhead
+
+| Scenario | Latency | Overhead |
+|----------|---------|----------|
+| Without metrics | 165.7 ns | - |
+| With metrics | 459.7 ns | +294 ns (~2x) |
+
 ## Анализ
 
 ### Token Bucket
@@ -33,6 +60,14 @@
 - Незначительный компромисс между точностью и производительностью
 - Лучшее решение для систем с высокой пропускной способностью
 
+## Ключевые моменты
+
+1. **Token Bucket** — лучший баланс скорости и памяти для общего использования
+2. **Sliding Counter** — лучшая производительность при параллельных запросах
+3. **Sliding Log** — самый быстрый для single-key, но память O(n)
+4. **Redis** добавляет ~230µs latency (сеть + Lua script)
+5. **Prometheus** добавляет ~300ns overhead — приемлемо для production
+
 ## Рекомендации
 
 | Use Case                    | Рекомендуемый алгоритм |
@@ -41,3 +76,11 @@
 | User quotas                 | Sliding Counter      |
 | Precise billing/audit       | Sliding Log          |
 | High-concurrency service    | Sliding Counter      |
+
+
+| Use Case | Рекомендация | Объяснение |
+|----------|-------------|-----|
+| Single server API | Token Bucket (memory) | Быстрый, простой, допускающий всплески |
+| Microservices cluster | Redis + Sliding Counter | Распределенный, согласованный |
+| High-precision billing | Sliding Log | Точный подсчет |
+| Maximum throughput | Sliding Counter (memory) | Наилучшая параллельная производительность |
