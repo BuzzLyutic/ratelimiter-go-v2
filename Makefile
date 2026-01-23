@@ -1,10 +1,10 @@
 .PHONY: all build test test-race test-cover lint bench clean help
+.PHONY: docker-up docker-down demo example-basic example-gin example-chi
 
 # Go параметры
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 GOFMT=gofmt
 
@@ -12,13 +12,13 @@ GOFMT=gofmt
 COVERAGE_FILE=coverage.out
 COVERAGE_HTML=coverage.html
 
-# Цвета оформления
+# Цвета
 GREEN=\033[0;32m
-NC=\033[0m # Нет цвета
+NC=\033[0m
 
 all: lint test build
 
-## build: Сборка проекта
+## build: Сборка всех примеров
 build:
 	@echo "$(GREEN)Building...$(NC)"
 	$(GOBUILD) -v ./...
@@ -28,7 +28,7 @@ test:
 	@echo "$(GREEN)Running tests...$(NC)"
 	$(GOTEST) -v ./...
 
-## test-race: Запуск тестов с детектором race condition
+## test-race: Запуск тестов с race detector
 test-race:
 	@echo "$(GREEN)Running tests with race detector...$(NC)"
 	$(GOTEST) -race -v ./...
@@ -39,27 +39,23 @@ test-cover:
 	$(GOTEST) -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./...
 	$(GOCMD) tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_HTML)
 	$(GOCMD) tool cover -func=$(COVERAGE_FILE) | tail -n 1
+	@echo "$(GREEN)Open $(COVERAGE_HTML) in browser$(NC)"
 
 ## lint: Запуск линтера
 lint:
 	@echo "$(GREEN)Running linter...$(NC)"
-	@which golangci-lint > /dev/null || (echo "Installing golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+	@which golangci-lint > /dev/null || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run ./...
 
-## bench: Запуск бенчмарков
+## bench: Запуск всех бенчмарков
 bench:
 	@echo "$(GREEN)Running benchmarks...$(NC)"
 	$(GOTEST) -bench=. -benchmem ./... | tee benchmark/results/latest.txt
 
-## bench-memory: Бенчмарк для хранения только в памяти
-bench-memory:
-	@echo "$(GREEN)Running memory benchmarks...$(NC)"
-	$(GOTEST) -bench=. -benchmem ./store/memory/... ./limiter/...
-
-## bench-redis: Бенчмарк для хранения только в Redis
-bench-redis:
-	@echo "$(GREEN)Running redis benchmarks...$(NC)"
-	$(GOTEST) -bench=. -benchmem ./store/redis/...
+## bench-compare: Запуск бенчмарков и сравнение алгоритмов
+bench-compare:
+	@echo "$(GREEN)Comparing algorithms...$(NC)"
+	$(GOTEST) -bench=. -benchmem ./limiter/... 
 
 ## fmt: Форматирование кода
 fmt:
@@ -78,18 +74,43 @@ clean:
 	rm -rf bin/ dist/
 	$(GOCMD) clean -testcache
 
-## docker-up: Запуск сервисов docker-compose
+## docker-up: Запуск всех сервисов (Redis, Prometheus, Grafana)
 docker-up:
 	docker-compose up -d
+	@echo ""
+	@echo "$(GREEN)Services started:$(NC)"
+	@echo "  API:        http://localhost:8080"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Grafana:    http://localhost:3000 (admin/admin)"
 
-## docker-down: Остановка сервисов docker-compose
+## docker-down: Остановка всех сервисов
 docker-down:
 	docker-compose down
 
-## help: Вывод доступных команд
+## docker-logs: Показать логи
+docker-logs:
+	docker-compose logs -f
+
+## demo: Запустить интерактивную демонстрацию
+demo:
+	@echo "$(GREEN)Starting interactive demo...$(NC)"
+	$(GOCMD) run ./examples/demo/main.go
+
+example-basic:
+	$(GOCMD) run ./examples/basic/main.go
+
+example-gin:
+	$(GOCMD) run ./examples/gin-api/main.go
+
+example-chi:
+	$(GOCMD) run ./examples/chi-api/main.go
+
+example-prometheus:
+	$(GOCMD) run ./examples/prometheus/main.go
+
+## help: Показать доступные команды
 help:
 	@echo "Available commands:"
 	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/ /'
 
-# Default target
 .DEFAULT_GOAL := help
